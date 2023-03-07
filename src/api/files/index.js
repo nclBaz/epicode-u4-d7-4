@@ -5,7 +5,8 @@ import { v2 as cloudinary } from "cloudinary"
 import { CloudinaryStorage } from "multer-storage-cloudinary"
 import { pipeline } from "stream"
 import { createGzip } from "zlib"
-import { getBooksJSONReadableStream, saveUsersAvatars } from "../../lib/fs-tools.js"
+import { getBooks, getBooksJSONReadableStream, saveUsersAvatars } from "../../lib/fs-tools.js"
+import { getPDFReadableStream } from "../../lib/pdf-tools.js"
 
 const filesRouter = Express.Router()
 
@@ -57,6 +58,23 @@ filesRouter.get("/booksJSON", (req, res, next) => {
     const transform = createGzip()
 
     pipeline(source, transform, destination, err => {
+      if (err) console.log(err)
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+filesRouter.get("/pdf", async (req, res, next) => {
+  try {
+    res.setHeader("Content-Disposition", "attachment; filename=example.pdf") // Without this header the browser will try to open (not save) the file.
+    // This header will tell the browser to open the "save file as" dialog
+    // SOURCE (READABLE STREAM pdfmake) --> DESTINATION (WRITABLE STREAM http response)
+    const books = await getBooks()
+    const source = getPDFReadableStream(books[0])
+    const destination = res
+
+    pipeline(source, destination, err => {
       if (err) console.log(err)
     })
   } catch (error) {
