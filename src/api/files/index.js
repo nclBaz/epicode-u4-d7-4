@@ -3,7 +3,9 @@ import multer from "multer"
 import { extname } from "path"
 import { v2 as cloudinary } from "cloudinary"
 import { CloudinaryStorage } from "multer-storage-cloudinary"
-import { saveUsersAvatars } from "../../lib/fs-tools.js"
+import { pipeline } from "stream"
+import { createGzip } from "zlib"
+import { getBooksJSONReadableStream, saveUsersAvatars } from "../../lib/fs-tools.js"
 
 const filesRouter = Express.Router()
 
@@ -39,6 +41,24 @@ filesRouter.post("/:userId/multiple", multer().array("avatars"), async (req, res
     await Promise.all(req.files.map(file => saveUsersAvatars(file.originalname, file.buffer)))
     console.log("REQ FILES:", req.files)
     res.send({ message: "files uploaded" })
+  } catch (error) {
+    next(error)
+  }
+})
+
+filesRouter.get("/booksJSON", (req, res, next) => {
+  try {
+    // SOURCES (file on disk, http request,...) --> DESTINATIONS (file on disk, terminal, http response, ...)
+    res.setHeader("Content-Disposition", "attachment; filename=books.json.gz") // Without this header the browser will try to open (not save) the file.
+    // This header will tell the browser to open the "save file as" dialog
+    // SOURCE (READABLE STREAM on books.json file) --> DESTINATION (WRITABLE STREAM http response)
+    const source = getBooksJSONReadableStream()
+    const destination = res
+    const transform = createGzip()
+
+    pipeline(source, transform, destination, err => {
+      if (err) console.log(err)
+    })
   } catch (error) {
     next(error)
   }
